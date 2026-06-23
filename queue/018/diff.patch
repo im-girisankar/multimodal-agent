@@ -1,0 +1,67 @@
+diff --git a/tests/test_output.py b/tests/test_output.py
+new file mode 100644
+index 0000000..6aae2ce
+--- /dev/null
++++ b/tests/test_output.py
+@@ -0,0 +1,61 @@
++"""Tests for OutputSink implementations."""
++
++from __future__ import annotations
++
++from multimodal_agent.output import OutputSink, PrintSink, TextSink
++
++
++class TestTextSink:
++    def test_send_collects_message(self):
++        sink = TextSink()
++        sink.send("hello")
++        assert sink.messages == ["hello"]
++
++    def test_send_multiple_messages(self):
++        sink = TextSink()
++        sink.send("first")
++        sink.send("second")
++        assert sink.messages == ["first", "second"]
++
++    def test_last_returns_most_recent(self):
++        sink = TextSink()
++        sink.send("a")
++        sink.send("b")
++        assert sink.last == "b"
++
++    def test_last_is_none_when_empty(self):
++        sink = TextSink()
++        assert sink.last is None
++
++    def test_clear_removes_all_messages(self):
++        sink = TextSink()
++        sink.send("msg")
++        sink.clear()
++        assert sink.messages == []
++        assert sink.last is None
++
++    def test_messages_returns_copy(self):
++        """Mutating the returned list should not affect the sink's internal state."""
++        sink = TextSink()
++        sink.send("keep")
++        msgs = sink.messages
++        msgs.append("injected")
++        assert sink.messages == ["keep"]
++
++    def test_text_sink_satisfies_protocol(self):
++        sink = TextSink()
++        assert isinstance(sink, OutputSink)
++
++
++class TestPrintSink:
++    def test_print_sink_send(self, capsys):
++        sink = PrintSink()
++        sink.send("printed output")
++        captured = capsys.readouterr()
++        assert "printed output" in captured.out
++
++    def test_no_heavy_imports(self):
++        import sys
++
++        for banned in ("whisper", "pyttsx3", "PIL", "anthropic"):
++            assert banned not in sys.modules

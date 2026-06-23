@@ -1,0 +1,67 @@
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+new file mode 100644
+index 0000000..a6e67fb
+--- /dev/null
++++ b/tests/test_cli.py
+@@ -0,0 +1,61 @@
++"""Tests for the CLI entry point."""
++
++from __future__ import annotations
++
++import sys
++
++import pytest
++
++from multimodal_agent.cli import main
++
++
++class TestCLIRun:
++    def test_run_exits_zero(self):
++        """mma run should exit with code 0."""
++        with pytest.raises(SystemExit) as exc_info:
++            main(["run", "hello"])
++        assert exc_info.value.code == 0
++
++    def test_run_prints_output(self, capsys):
++        """mma run should print something to stdout."""
++        with pytest.raises(SystemExit):
++            main(["run", "hello"])
++        captured = capsys.readouterr()
++        assert len(captured.out.strip()) > 0
++
++    def test_run_with_calc_text(self, capsys):
++        """mma run with 'calc' in input should exercise the tool path."""
++        with pytest.raises(SystemExit):
++            main(["run", "calc 2 + 2"])
++        captured = capsys.readouterr()
++        # Some output should appear (either result or final response).
++        assert len(captured.out.strip()) > 0
++
++    def test_tools_subcommand_exits_zero(self):
++        with pytest.raises(SystemExit) as exc_info:
++            main(["tools"])
++        assert exc_info.value.code == 0
++
++    def test_tools_subcommand_lists_tools(self, capsys):
++        with pytest.raises(SystemExit):
++            main(["tools"])
++        captured = capsys.readouterr()
++        assert "calculator" in captured.out
++        assert "clock" in captured.out
++
++    def test_no_subcommand_exits_zero(self, capsys):
++        """Calling mma with no subcommand should print help and exit 0."""
++        with pytest.raises(SystemExit) as exc_info:
++            main([])
++        assert exc_info.value.code == 0
++
++    def test_max_steps_flag(self, capsys):
++        """--max-steps flag should be accepted without error."""
++        with pytest.raises(SystemExit) as exc_info:
++            main(["run", "hello", "--max-steps", "5"])
++        assert exc_info.value.code == 0
++
++    def test_no_heavy_imports(self):
++
++        for banned in ("whisper", "pyttsx3", "PIL", "anthropic"):
++            assert banned not in sys.modules

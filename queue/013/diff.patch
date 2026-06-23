@@ -1,0 +1,61 @@
+diff --git a/src/multimodal_agent/types.py b/src/multimodal_agent/types.py
+new file mode 100644
+index 0000000..d7257a4
+--- /dev/null
++++ b/src/multimodal_agent/types.py
+@@ -0,0 +1,55 @@
++"""Core data types for the multimodal agent loop."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++from typing import Any
++
++
++@dataclass
++class ToolCall:
++    """An action that invokes a registered tool."""
++
++    name: str
++    args: dict[str, Any] = field(default_factory=dict)
++
++
++@dataclass
++class FinalResponse:
++    """An action that terminates the agent loop with a text answer."""
++
++    text: str
++
++
++# Union type for actions the reasoner can emit.
++Action = ToolCall | FinalResponse
++
++
++@dataclass
++class Observation:
++    """The result of executing a tool call."""
++
++    tool_name: str
++    result: str
++
++
++@dataclass
++class Context:
++    """Accumulated conversation/perception state passed through the agent loop."""
++
++    text: str
++    observations: list[Observation] = field(default_factory=list)
++
++    def with_observation(self, observation: Observation) -> Context:
++        """Return a new Context with the given observation appended."""
++        return Context(
++            text=self.text,
++            observations=self.observations + [observation],
++        )
++
++    def summary(self) -> str:
++        """A single string summarising the full context (input + tool history)."""
++        parts = [f"Input: {self.text}"]
++        for obs in self.observations:
++            parts.append(f"Tool '{obs.tool_name}' returned: {obs.result}")
++        return "\n".join(parts)

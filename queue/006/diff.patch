@@ -1,0 +1,67 @@
+diff --git a/src/multimodal_agent/adapters/vision.py b/src/multimodal_agent/adapters/vision.py
+new file mode 100644
+index 0000000..0f5a31b
+--- /dev/null
++++ b/src/multimodal_agent/adapters/vision.py
+@@ -0,0 +1,61 @@
++"""Vision modality using Pillow (image caption stub).
++
++Requires the ``vision`` optional dependency group::
++
++    pip install 'multimodal-agent[vision]'
++
++Heavy imports are deferred to ``capture()`` so the package can be imported
++without Pillow installed.
++"""
++
++from __future__ import annotations
++
++import os
++
++
++class VisionModality:
++    """Load an image and return a text caption.
++
++    This is a *stub* implementation: it returns basic metadata (format, size)
++    rather than running a real vision model.  A real implementation would
++    call a captioning model or pass the image to a multimodal LLM.
++
++    Parameters
++    ----------
++    image_path:
++        Path to the image file to describe.
++    """
++
++    def __init__(self, image_path: str) -> None:
++        self._image_path = image_path
++
++    def capture(self) -> str:
++        """Load the image and return a description string.
++
++        Raises
++        ------
++        ImportError
++            If Pillow is not installed.
++        FileNotFoundError
++            If *image_path* does not exist.
++        """
++        try:
++            from PIL import Image  # type: ignore[import]
++        except ImportError as exc:
++            raise ImportError(
++                "The 'vision' extra is required for VisionModality.\n"
++                "Install it with: pip install 'multimodal-agent[vision]'"
++            ) from exc
++
++        if not os.path.isfile(self._image_path):
++            raise FileNotFoundError(f"Image file not found: {self._image_path}")
++
++        with Image.open(self._image_path) as img:
++            fmt = img.format or "unknown"
++            width, height = img.size
++            mode = img.mode
++
++        return (
++            f"Image: {os.path.basename(self._image_path)} | "
++            f"format={fmt} size={width}x{height} mode={mode}"
++        )

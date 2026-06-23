@@ -1,0 +1,95 @@
+diff --git a/src/multimodal_agent/cli.py b/src/multimodal_agent/cli.py
+new file mode 100644
+index 0000000..0f72afe
+--- /dev/null
++++ b/src/multimodal_agent/cli.py
+@@ -0,0 +1,89 @@
++"""Command-line interface for the multimodal agent.
++
++Usage
++-----
++    mma run "<text>"        # Run the agent loop on the provided text.
++    mma tools               # List registered tools.
++    mma --help              # Show help.
++"""
++
++from __future__ import annotations
++
++import argparse
++import sys
++
++from multimodal_agent.agent import Agent
++from multimodal_agent.modality import TextModality
++from multimodal_agent.output import PrintSink
++from multimodal_agent.reasoner import MockReasoner
++from multimodal_agent.tools import default_registry
++
++
++def _build_parser() -> argparse.ArgumentParser:
++    parser = argparse.ArgumentParser(
++        prog="mma",
++        description="Multimodal Agent â€” perceive â†’ reason â†’ act â†’ respond",
++    )
++    sub = parser.add_subparsers(dest="command")
++
++    # mma run "<text>"
++    run_parser = sub.add_parser("run", help="Run the agent on a text prompt.")
++    run_parser.add_argument("text", help="The input text to send to the agent.")
++    run_parser.add_argument(
++        "--max-steps",
++        type=int,
++        default=10,
++        metavar="N",
++        help="Maximum reasoning steps (default: 10).",
++    )
++
++    # mma tools
++    sub.add_parser("tools", help="List all registered tools.")
++
++    return parser
++
++
++def _cmd_run(args: argparse.Namespace) -> int:
++    """Handle the `mma run` subcommand."""
++    agent = Agent(
++        modality=TextModality(args.text),
++        reasoner=MockReasoner(),
++        registry=default_registry,
++        sink=PrintSink(),
++        max_steps=args.max_steps,
++    )
++    agent.run(args.text)
++    # PrintSink already printed the final response.
++    return 0
++
++
++def _cmd_tools(_args: argparse.Namespace) -> int:
++    """Handle the `mma tools` subcommand."""
++    names = default_registry.names()
++    if names:
++        print("Registered tools:")
++        for name in names:
++            print(f"  â€¢ {name}")
++    else:
++        print("No tools registered.")
++    return 0
++
++
++def main(argv: list[str] | None = None) -> None:
++    """Entry point for the ``mma`` command."""
++    parser = _build_parser()
++    args = parser.parse_args(argv)
++
++    if args.command == "run":
++        code = _cmd_run(args)
++    elif args.command == "tools":
++        code = _cmd_tools(args)
++    else:
++        parser.print_help()
++        code = 0
++
++    sys.exit(code)
++
++
++if __name__ == "__main__":
++    main()

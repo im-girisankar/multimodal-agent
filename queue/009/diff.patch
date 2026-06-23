@@ -1,0 +1,39 @@
+diff --git a/src/multimodal_agent/modality.py b/src/multimodal_agent/modality.py
+new file mode 100644
+index 0000000..3e089d4
+--- /dev/null
++++ b/src/multimodal_agent/modality.py
+@@ -0,0 +1,33 @@
++"""Modality interface and built-in stubs.
++
++A Modality captures raw input (audio, image, text) and returns a text
++representation that the reasoning stage can work with.
++"""
++
++from __future__ import annotations
++
++from typing import Protocol, runtime_checkable
++
++
++@runtime_checkable
++class Modality(Protocol):
++    """Protocol that every modality adapter must satisfy."""
++
++    def capture(self) -> str:
++        """Capture input and return its text representation."""
++        ...
++
++
++class TextModality:
++    """Stub modality that simply returns a pre-configured text string.
++
++    Used in tests and the CLI demo so the full agent loop can run offline
++    without any hardware, models, or external dependencies.
++    """
++
++    def __init__(self, text: str) -> None:
++        self._text = text
++
++    def capture(self) -> str:
++        """Return the pre-configured text."""
++        return self._text

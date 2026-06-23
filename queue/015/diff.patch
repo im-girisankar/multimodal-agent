@@ -1,0 +1,144 @@
+diff --git a/tests/test_agent.py b/tests/test_agent.py
+new file mode 100644
+index 0000000..2515a32
+--- /dev/null
++++ b/tests/test_agent.py
+@@ -0,0 +1,138 @@
++"""Tests for the Agent class and the perceive â†’ reason â†’ act â†’ respond loop."""
++
++from __future__ import annotations
++
++from multimodal_agent.agent import STEP_CAP_MESSAGE, Agent
++from multimodal_agent.modality import TextModality
++from multimodal_agent.output import TextSink
++from multimodal_agent.reasoner import MockReasoner
++from multimodal_agent.tools import default_registry
++from multimodal_agent.types import FinalResponse, ToolCall
++
++
++class TestAgentBasicLoop:
++    def _make_agent(self, text: str, script=None, max_steps: int = 10) -> tuple[Agent, TextSink]:
++        sink = TextSink()
++        reasoner = MockReasoner(script=script)
++        agent = Agent(
++            modality=TextModality(text),
++            reasoner=reasoner,
++            registry=default_registry,
++            sink=sink,
++            max_steps=max_steps,
++        )
++        return agent, sink
++
++    def test_direct_final_response(self):
++        """MockReasoner with no tool triggers returns a FinalResponse immediately."""
++        agent, sink = self._make_agent("hello there")
++        result = agent.run("hello there")
++        assert result == "You said: hello there"
++        assert sink.last == "You said: hello there"
++
++    def test_sink_receives_final_response(self):
++        agent, sink = self._make_agent("hello")
++        agent.run("hello")
++        assert len(sink.messages) == 1
++
++    def test_scripted_single_final_response(self):
++        script = [FinalResponse(text="scripted answer")]
++        agent, sink = self._make_agent("any", script=script)
++        result = agent.run("any")
++        assert result == "scripted answer"
++
++    def test_scripted_tool_call_then_final_response(self):
++        """Agent dispatches a tool and feeds the observation back before finishing."""
++        script = [
++            ToolCall(name="calculator", args={"a": 3.0, "op": "+", "b": 4.0}),
++            FinalResponse(text="done"),
++        ]
++        agent, sink = self._make_agent("any", script=script)
++        result = agent.run("any")
++        assert result == "done"
++
++    def test_tool_observation_fed_back_to_reasoner(self):
++        """Verify that the agent feeds tool observations back into context."""
++        observations_seen: list = []
++
++        class SpyReasoner:
++            def __init__(self):
++                self._step = 0
++
++            def decide(self, context):
++                self._step += 1
++                if self._step == 1:
++                    return ToolCall(name="calculator", args={"a": 2.0, "op": "*", "b": 3.0})
++                # Capture what we see.
++                observations_seen.extend(context.observations)
++                return FinalResponse(text="observed")
++
++        sink = TextSink()
++        agent = Agent(
++            modality=TextModality("x"),
++            reasoner=SpyReasoner(),
++            registry=default_registry,
++            sink=sink,
++        )
++        agent.run("x")
++        assert len(observations_seen) == 1
++        assert observations_seen[0].tool_name == "calculator"
++        assert observations_seen[0].result == "6"
++
++    def test_heuristic_calc_trigger(self):
++        """Heuristic reasoner emits a ToolCall when input contains 'calc'."""
++        agent, sink = self._make_agent("calc 10 + 5")
++        result = agent.run("calc 10 + 5")
++        # After the tool call, MockReasoner emits a FinalResponse.
++        assert "15" in result or "calculator" in result.lower()
++
++    def test_heuristic_time_trigger(self):
++        """Heuristic reasoner emits a ToolCall for the clock when input contains 'time'."""
++        agent, sink = self._make_agent("what time is it?")
++        result = agent.run("what time is it?")
++        assert "clock" in result.lower() or "utc" in result.lower()
++
++    def test_step_cap_prevents_infinite_loop(self):
++        """When the reasoner never returns FinalResponse, step cap kicks in."""
++
++        class LoopingReasoner:
++            def decide(self, context):
++                return ToolCall(name="calculator", args={"a": 1.0, "op": "+", "b": 1.0})
++
++        sink = TextSink()
++        agent = Agent(
++            modality=TextModality("loop"),
++            reasoner=LoopingReasoner(),
++            registry=default_registry,
++            sink=sink,
++            max_steps=3,
++        )
++        result = agent.run("loop")
++        assert result == STEP_CAP_MESSAGE
++        assert sink.last == STEP_CAP_MESSAGE
++
++    def test_step_cap_message_content(self):
++        assert "Maximum steps" in STEP_CAP_MESSAGE
++
++    def test_unknown_tool_error_returned_as_observation(self):
++        """If a tool raises ToolError, the agent wraps it and continues."""
++        script = [
++            ToolCall(name="no_such_tool", args={}),
++            FinalResponse(text="recovered"),
++        ]
++        sink = TextSink()
++        agent = Agent(
++            modality=TextModality("x"),
++            reasoner=MockReasoner(script=script),
++            registry=default_registry,
++            sink=sink,
++        )
++        result = agent.run("x")
++        # Agent should NOT raise; it should recover and return the final response.
++        assert result == "recovered"
++
++    def test_no_heavy_imports(self):
++        import sys
++
++        for banned in ("whisper", "pyttsx3", "PIL", "anthropic"):
++            assert banned not in sys.modules

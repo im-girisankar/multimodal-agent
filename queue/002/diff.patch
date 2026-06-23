@@ -1,0 +1,16 @@
+diff --git a/src/multimodal_agent/adapters/__init__.py b/src/multimodal_agent/adapters/__init__.py
+new file mode 100644
+index 0000000..c4812c7
+--- /dev/null
++++ b/src/multimodal_agent/adapters/__init__.py
+@@ -0,0 +1,10 @@
++"""Optional heavy adapters (STT, vision, TTS, LLM).
++
++None of these are imported automatically.  Import them explicitly only when
++the corresponding extras are installed:
++
++    from multimodal_agent.adapters.stt import WhisperModality   # needs 'audio' extra
++    from multimodal_agent.adapters.vision import VisionModality  # needs 'vision' extra
++    from multimodal_agent.adapters.tts import TTSSink            # needs 'audio' extra
++    from multimodal_agent.adapters.llm import LLMReasoner        # needs 'llm' extra
++"""

@@ -1,0 +1,96 @@
+diff --git a/src/multimodal_agent/reasoner.py b/src/multimodal_agent/reasoner.py
+new file mode 100644
+index 0000000..46116ea
+--- /dev/null
++++ b/src/multimodal_agent/reasoner.py
+@@ -0,0 +1,90 @@
++"""Reasoner interface and built-in implementations.
++
++A Reasoner inspects the current Context and decides what to do next:
++either call a tool (ToolCall) or emit a final answer (FinalResponse).
++"""
++
++from __future__ import annotations
++
++from typing import Protocol, runtime_checkable
++
++from multimodal_agent.types import Action, Context, FinalResponse, ToolCall
++
++
++@runtime_checkable
++class Reasoner(Protocol):
++    """Protocol that every reasoner must satisfy."""
++
++    def decide(self, context: Context) -> Action:
++        """Given the current context, return the next action."""
++        ...
++
++
++class MockReasoner:
++    """Rule-based, scriptable reasoner for offline testing.
++
++    Two modes
++    ---------
++    1. **Scripted**: pass a list of :class:`Action` objects as ``script``.
++       The reasoner pops them in order; when the script is exhausted it
++       returns a :class:`FinalResponse` with "Script exhausted".
++
++    2. **Heuristic** (default, when ``script`` is ``None``):
++       - If the input text contains "calc" â†’ emit a ``ToolCall`` for the
++         calculator tool on the first call, then emit a ``FinalResponse``
++         on the next call (after observing the tool result).
++       - If the input text contains "time" â†’ same, but for the clock tool.
++       - Otherwise â†’ emit a ``FinalResponse`` immediately.
++    """
++
++    def __init__(self, script: list[Action] | None = None) -> None:
++        self._script: list[Action] | None = list(script) if script is not None else None
++        self._call_count: int = 0
++
++    def decide(self, context: Context) -> Action:
++        """Return the next action based on script or heuristics."""
++        if self._script is not None:
++            if self._script:
++                return self._script.pop(0)
++            return FinalResponse(text="Script exhausted")
++
++        # Heuristic mode.
++        text_lower = context.text.lower()
++        has_observations = bool(context.observations)
++
++        if has_observations:
++            # We already ran a tool â€” summarise and finish.
++            last = context.observations[-1]
++            return FinalResponse(
++                text=f"The {last.tool_name} result is: {last.result}"
++            )
++
++        if "calc" in text_lower:
++            # Parse a simple "calc N op M" from the text if possible,
++            # otherwise fall back to a safe default.
++            args = _parse_calc_args(context.text)
++            return ToolCall(name="calculator", args=args)
++
++        if "time" in text_lower:
++            return ToolCall(name="clock", args={})
++
++        return FinalResponse(text=f"You said: {context.text}")
++
++
++# ---------------------------------------------------------------------------
++# Helpers
++# ---------------------------------------------------------------------------
++
++def _parse_calc_args(text: str) -> dict:
++    """Try to extract 'a op b' from a string like 'calc 3 + 4'.
++
++    Falls back to ``{"a": 1, "op": "+", "b": 1}`` if parsing fails.
++    """
++    import re
++
++    pattern = r"(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)"
++    match = re.search(pattern, text)
++    if match:
++        a, op, b = match.groups()
++        return {"a": float(a), "op": op, "b": float(b)}
++    return {"a": 1.0, "op": "+", "b": 1.0}

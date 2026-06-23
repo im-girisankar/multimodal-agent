@@ -1,0 +1,123 @@
+diff --git a/src/multimodal_agent/adapters/llm.py b/src/multimodal_agent/adapters/llm.py
+new file mode 100644
+index 0000000..00724c0
+--- /dev/null
++++ b/src/multimodal_agent/adapters/llm.py
+@@ -0,0 +1,117 @@
++"""LLM-powered reasoner using the Anthropic SDK.
++
++Requires the ``llm`` optional dependency group::
++
++    pip install 'multimodal-agent[llm]'
++
++The ``anthropic`` library is imported lazily inside ``decide()`` so the
++package can be imported without an API key or the SDK installed.
++"""
++
++from __future__ import annotations
++
++import json
++
++from multimodal_agent.types import Action, Context, FinalResponse, ToolCall
++
++_DEFAULT_MODEL = "claude-haiku-4-5"
++
++_SYSTEM_PROMPT = """\
++You are a helpful assistant with access to tools.
++When you need to use a tool, respond ONLY with a JSON object of this form:
++{"tool_call": {"name": "<tool_name>", "args": {<key>: <value>, ...}}}
++
++When you have a final answer, respond ONLY with a JSON object of this form:
++{"final_response": {"text": "<your answer>"}}
++
++Do not include any other text outside the JSON.
++"""
++
++
++class LLMReasoner:
++    """Calls the Anthropic Messages API to decide the next action.
++
++    Parameters
++    ----------
++    model:
++        Anthropic model ID (default: ``"claude-haiku-4-5"``).
++    api_key:
++        Anthropic API key.  Falls back to the ``ANTHROPIC_API_KEY``
++        environment variable if omitted.
++    tool_names:
++        Optional list of available tool names to include in the prompt.
++    """
++
++    def __init__(
++        self,
++        model: str = _DEFAULT_MODEL,
++        api_key: str | None = None,
++        tool_names: list[str] | None = None,
++    ) -> None:
++        self._model = model
++        self._api_key = api_key
++        self._tool_names = tool_names or []
++        self._client = None  # initialised lazily
++
++    def _get_client(self):  # type: ignore[return]
++        """Lazily create and return the Anthropic client."""
++        if self._client is None:
++            try:
++                import anthropic  # type: ignore[import]
++            except ImportError as exc:
++                raise ImportError(
++                    "The 'llm' extra is required for LLMReasoner.\n"
++                    "Install it with: pip install 'multimodal-agent[llm]'"
++                ) from exc
++            kwargs: dict = {}
++            if self._api_key:
++                kwargs["api_key"] = self._api_key
++            self._client = anthropic.Anthropic(**kwargs)
++        return self._client
++
++    def decide(self, context: Context) -> Action:
++        """Ask the LLM what to do next given *context*.
++
++        Returns
++        -------
++        Action
++            Either a :class:`ToolCall` or a :class:`FinalResponse`.
++        """
++        client = self._get_client()
++        tool_hint = (
++            f"Available tools: {', '.join(self._tool_names)}" if self._tool_names else ""
++        )
++        user_content = context.summary()
++        if tool_hint:
++            user_content = f"{tool_hint}\n\n{user_content}"
++
++        response = client.messages.create(
++            model=self._model,
++            max_tokens=512,
++            system=_SYSTEM_PROMPT,
++            messages=[{"role": "user", "content": user_content}],
++        )
++        raw = next(
++            (b.text for b in response.content if getattr(b, "type", None) == "text"),
++            "",
++        ).strip()
++
++        if not raw:
++            # No text block in the response (e.g. refusal or content-filtered).
++            return FinalResponse(text="(no response)")
++
++        try:
++            data = json.loads(raw)
++        except json.JSONDecodeError:
++            # Graceful fallback: treat LLM prose as a final response.
++            return FinalResponse(text=raw)
++
++        if "tool_call" in data:
++            tc = data["tool_call"]
++            return ToolCall(name=tc["name"], args=tc.get("args", {}))
++
++        if "final_response" in data:
++            return FinalResponse(text=data["final_response"]["text"])
++
++        # Unknown structure â€” return as-is.
++        return FinalResponse(text=raw)

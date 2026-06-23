@@ -1,0 +1,98 @@
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+new file mode 100644
+index 0000000..da6611c
+--- /dev/null
++++ b/tests/test_tools.py
+@@ -0,0 +1,92 @@
++"""Tests for the ToolRegistry and built-in tools."""
++
++from __future__ import annotations
++
++import pytest
++
++from multimodal_agent.tools import ToolError, ToolRegistry, calculator, clock, default_registry
++
++
++class TestCalculator:
++    def test_addition(self):
++        assert calculator(3.0, "+", 4.0) == "7"
++
++    def test_subtraction(self):
++        assert calculator(10.0, "-", 3.0) == "7"
++
++    def test_multiplication(self):
++        assert calculator(6.0, "*", 7.0) == "42"
++
++    def test_division(self):
++        assert calculator(10.0, "/", 4.0) == "2.5"
++
++    def test_power(self):
++        assert calculator(2.0, "**", 8.0) == "256"
++
++    def test_division_by_zero_raises(self):
++        with pytest.raises(ValueError, match="Division by zero"):
++            calculator(1.0, "/", 0.0)
++
++    def test_unknown_operator_raises(self):
++        with pytest.raises(ValueError, match="Unsupported operator"):
++            calculator(1.0, "%", 2.0)
++
++    def test_float_result_preserved(self):
++        result = calculator(1.0, "/", 3.0)
++        # Should contain a decimal point since 1/3 is not an integer.
++        assert "." in result
++
++
++class TestClock:
++    def test_clock_returns_string(self):
++        result = clock()
++        assert isinstance(result, str)
++        assert len(result) > 0
++
++    def test_clock_contains_utc(self):
++        result = clock()
++        assert "UTC" in result
++
++    def test_clock_custom_format(self):
++        result = clock(fmt="%Y")
++        # Should be a 4-digit year.
++        assert result.isdigit()
++        assert len(result) == 4
++
++
++class TestToolRegistry:
++    def test_register_and_dispatch(self):
++        reg = ToolRegistry()
++        reg.register("echo", lambda text="": text)
++        assert reg.dispatch("echo", {"text": "hi"}) == "hi"
++
++    def test_unknown_tool_raises_tool_error(self):
++        reg = ToolRegistry()
++        with pytest.raises(ToolError, match="Unknown tool"):
++            reg.dispatch("nonexistent", {})
++
++    def test_names_returns_sorted_list(self):
++        reg = ToolRegistry()
++        reg.register("zebra", lambda: "z")
++        reg.register("apple", lambda: "a")
++        assert reg.names() == ["apple", "zebra"]
++
++    def test_tool_exception_wrapped_in_tool_error(self):
++        reg = ToolRegistry()
++        reg.register("boom", lambda: 1 / 0)
++        with pytest.raises(ToolError, match="ZeroDivisionError"):
++            reg.dispatch("boom", {})
++
++
++class TestDefaultRegistry:
++    def test_default_registry_has_calculator(self):
++        assert "calculator" in default_registry.names()
++
++    def test_default_registry_has_clock(self):
++        assert "clock" in default_registry.names()
++
++    def test_no_heavy_imports(self):
++        import sys
++
++        for banned in ("whisper", "pyttsx3", "PIL", "anthropic"):
++            assert banned not in sys.modules

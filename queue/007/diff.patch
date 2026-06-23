@@ -1,0 +1,113 @@
+diff --git a/src/multimodal_agent/agent.py b/src/multimodal_agent/agent.py
+new file mode 100644
+index 0000000..dbab23c
+--- /dev/null
++++ b/src/multimodal_agent/agent.py
+@@ -0,0 +1,107 @@
++"""Agent class â€” the perceive â†’ reason â†’ act â†’ respond loop."""
++
++from __future__ import annotations
++
++from multimodal_agent.modality import Modality, TextModality
++from multimodal_agent.output import OutputSink, TextSink
++from multimodal_agent.reasoner import MockReasoner, Reasoner
++from multimodal_agent.tools import ToolRegistry, default_registry
++from multimodal_agent.types import Context, FinalResponse, Observation, ToolCall
++
++STEP_CAP_MESSAGE = "[Agent] Maximum steps reached without a final response."
++
++
++class Agent:
++    """Orchestrates the perceive â†’ reason â†’ act â†’ respond loop.
++
++    Parameters
++    ----------
++    modality:
++        How to capture/convert raw input into text.  Defaults to
++        :class:`TextModality` (pass-through).
++    reasoner:
++        Decides what to do next given the accumulated context.  Defaults to
++        :class:`MockReasoner`.
++    registry:
++        Tool registry for dispatching :class:`ToolCall` actions.  Defaults to
++        :data:`default_registry` which contains calculator and clock.
++    sink:
++        Where the final response is sent.  Defaults to :class:`TextSink`.
++    max_steps:
++        Hard cap on the number of reasoning iterations.  Prevents infinite
++        loops when the reasoner never emits a :class:`FinalResponse`.
++    """
++
++    def __init__(
++        self,
++        modality: Modality | None = None,
++        reasoner: Reasoner | None = None,
++        registry: ToolRegistry | None = None,
++        sink: OutputSink | None = None,
++        max_steps: int = 10,
++    ) -> None:
++        self.modality: Modality = modality or TextModality("")
++        self.reasoner: Reasoner = reasoner or MockReasoner()
++        self.registry: ToolRegistry = registry or default_registry
++        self.sink: OutputSink = sink or TextSink()
++        self.max_steps: int = max_steps
++
++    # ------------------------------------------------------------------
++    # Public interface
++    # ------------------------------------------------------------------
++
++    def run(self, text: str) -> str:
++        """Run the agent loop on *text* input.
++
++        The agent:
++        1. Perceives: wraps *text* in a :class:`Context`.
++        2. Reasons: asks the reasoner for an :class:`Action`.
++        3. Acts: if the action is a :class:`ToolCall`, dispatches it and
++           feeds the observation back; if it's a :class:`FinalResponse`,
++           sends it to the sink and returns.
++        4. Repeats until a :class:`FinalResponse` or the step cap.
++
++        Returns
++        -------
++        str
++            The final response text, or :data:`STEP_CAP_MESSAGE` if the
++            step cap was reached.
++        """
++        context = self._perceive(text)
++
++        for _step in range(self.max_steps):
++            action = self.reasoner.decide(context)
++
++            if isinstance(action, FinalResponse):
++                self.sink.send(action.text)
++                return action.text
++
++            if isinstance(action, ToolCall):
++                observation = self._dispatch(action)
++                context = context.with_observation(observation)
++                continue
++
++            # Defensive: unknown action type â€” treat as final response.
++            msg = f"[Agent] Unknown action type: {type(action).__name__}"
++            self.sink.send(msg)
++            return msg
++
++        # Step cap reached.
++        self.sink.send(STEP_CAP_MESSAGE)
++        return STEP_CAP_MESSAGE
++
++    # ------------------------------------------------------------------
++    # Private helpers
++    # ------------------------------------------------------------------
++
++    def _perceive(self, text: str) -> Context:
++        """Wrap *text* in a fresh :class:`Context`."""
++        return Context(text=text)
++
++    def _dispatch(self, tool_call: ToolCall) -> Observation:
++        """Execute the tool and return its result wrapped in an :class:`Observation`."""
++        try:
++            result = self.registry.dispatch(tool_call.name, tool_call.args)
++        except Exception as exc:  # noqa: BLE001
++            result = f"[ToolError] {exc}"
++        return Observation(tool_name=tool_call.name, result=result)

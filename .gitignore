@@ -54,3 +54,6 @@ share/python-wheels/
 .env
 *.pem
 *.key
+
+# drip scratch
+.drip/_*

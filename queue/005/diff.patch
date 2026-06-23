@@ -1,0 +1,56 @@
+diff --git a/src/multimodal_agent/adapters/tts.py b/src/multimodal_agent/adapters/tts.py
+new file mode 100644
+index 0000000..a10dcc9
+--- /dev/null
++++ b/src/multimodal_agent/adapters/tts.py
+@@ -0,0 +1,50 @@
++"""Text-to-Speech output sink using pyttsx3.
++
++Requires the ``audio`` optional dependency group::
++
++    pip install 'multimodal-agent[audio]'
++
++pyttsx3 is imported lazily inside ``send()`` so importing this module
++(and the package) succeeds without the library installed.
++"""
++
++from __future__ import annotations
++
++
++class TTSSink:
++    """Speak text aloud using pyttsx3.
++
++    Parameters
++    ----------
++    rate:
++        Speech rate in words per minute (default: 150).
++    volume:
++        Volume from 0.0 to 1.0 (default: 1.0).
++    """
++
++    def __init__(self, rate: int = 150, volume: float = 1.0) -> None:
++        self._rate = rate
++        self._volume = volume
++        self._engine = None  # initialised lazily
++
++    def _get_engine(self):  # type: ignore[return]
++        """Lazily initialise and return the pyttsx3 engine."""
++        if self._engine is None:
++            try:
++                import pyttsx3  # type: ignore[import]
++            except ImportError as exc:
++                raise ImportError(
++                    "The 'audio' extra is required for TTSSink.\n"
++                    "Install it with: pip install 'multimodal-agent[audio]'"
++                ) from exc
++            engine = pyttsx3.init()
++            engine.setProperty("rate", self._rate)
++            engine.setProperty("volume", self._volume)
++            self._engine = engine
++        return self._engine
++
++    def send(self, text: str) -> None:
++        """Speak *text* aloud and block until finished."""
++        engine = self._get_engine()
++        engine.say(text)
++        engine.runAndWait()

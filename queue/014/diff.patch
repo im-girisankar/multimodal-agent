@@ -1,0 +1,7 @@
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..f37e70b
+--- /dev/null
++++ b/tests/__init__.py
+@@ -0,0 +1 @@
++# Tests package â€” no code needed here.

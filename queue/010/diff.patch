@@ -1,0 +1,60 @@
+diff --git a/src/multimodal_agent/output.py b/src/multimodal_agent/output.py
+new file mode 100644
+index 0000000..c343c90
+--- /dev/null
++++ b/src/multimodal_agent/output.py
+@@ -0,0 +1,54 @@
++"""OutputSink interface and built-in implementations.
++
++An OutputSink receives the final agent response and does something with it
++(print to terminal, speak aloud, write to a file, etc.).
++"""
++
++from __future__ import annotations
++
++from typing import Protocol, runtime_checkable
++
++
++@runtime_checkable
++class OutputSink(Protocol):
++    """Protocol that every output sink must satisfy."""
++
++    def send(self, text: str) -> None:
++        """Send *text* to the output destination."""
++        ...
++
++
++class TextSink:
++    """In-memory sink that collects text for inspection.
++
++    Useful for tests and for the CLI where we want to capture output before
++    printing it.
++    """
++
++    def __init__(self) -> None:
++        self._messages: list[str] = []
++
++    def send(self, text: str) -> None:
++        """Append *text* to the internal message list."""
++        self._messages.append(text)
++
++    @property
++    def messages(self) -> list[str]:
++        """All messages received so far, in order."""
++        return list(self._messages)
++
++    @property
++    def last(self) -> str | None:
++        """The most recently received message, or ``None`` if empty."""
++        return self._messages[-1] if self._messages else None
++
++    def clear(self) -> None:
++        """Remove all collected messages."""
++        self._messages.clear()
++
++
++class PrintSink:
++    """Sink that writes each message to stdout via :func:`print`."""
++
++    def send(self, text: str) -> None:
++        print(text)
