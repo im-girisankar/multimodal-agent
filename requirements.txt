@@ -1,0 +1,10 @@
+# Core runtime — intentionally empty (no mandatory dependencies).
+# Install optional extras as needed:
+#   pip install -e ".[audio]"   # Whisper STT + pyttsx3 TTS
+#   pip install -e ".[vision]"  # Pillow image processing
+#   pip install -e ".[llm]"     # Anthropic LLM reasoner
+#   pip install -e ".[dev]"     # pytest + ruff for development
+
+# Dev tools (pinned for reproducibility in CI)
+pytest>=7.0
+ruff>=0.4

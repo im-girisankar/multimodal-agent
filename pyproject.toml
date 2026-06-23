@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multimodal-agent"
+version = "0.1.0"
+description = "A hands-free, see-and-act voice/vision agent loop."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Girisankar G", email = "girisankargopakumar@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+audio   = ["openai-whisper", "pyttsx3"]
+vision  = ["pillow"]
+llm     = ["anthropic>=0.39"]
+dev     = ["pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+mma = "multimodal_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths  = ["tests"]
+addopts    = "-q"
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select  = ["E", "F", "I", "UP", "B"]
+ignore  = ["E501"]
